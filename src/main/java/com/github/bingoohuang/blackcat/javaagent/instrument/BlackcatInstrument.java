@@ -19,8 +19,7 @@ import static com.github.bingoohuang.blackcat.javaagent.utils.TreeAsms.*;
 import static org.objectweb.asm.Opcodes.*;
 
 public class BlackcatInstrument {
-    protected final String callbackId;
-    protected final BlackcatJavaAgentInterceptor interceptor;
+    protected final BlackcatJavaAgentInterceptor interceptor = BlackcatJavaAgentCallback.INSTANCE;
     protected final String className;
     protected final byte[] classFileBuffer;
 
@@ -41,13 +40,9 @@ public class BlackcatInstrument {
     protected LabelNode startNode;
 
     public BlackcatInstrument(
-            String className, byte[] classfileBuffer,
-            BlackcatJavaAgentInterceptor interceptor,
-            String callbackId) {
+            String className, byte[] classFileBuffer) {
         this.className = className;
-        this.classFileBuffer = classfileBuffer;
-        this.callbackId = callbackId;
-        this.interceptor = interceptor;
+        this.classFileBuffer = classFileBuffer;
     }
 
     public byte[] modifyClass() {
@@ -58,7 +53,6 @@ public class BlackcatInstrument {
 
         boolean ok = interceptor.interceptClass(classNode, className);
         if (!ok) return classFileBuffer;
-
 
         int count = modifyMethodCount(classNode.methods);
         if (count == 0) return classFileBuffer;
@@ -71,7 +65,6 @@ public class BlackcatInstrument {
         Debugs.writeClassFile(classNode, className, bytes);
 
         return bytes;
-
     }
 
     private int modifyMethodCount(List<MethodNode> methods) {
@@ -151,10 +144,9 @@ public class BlackcatInstrument {
     }
 
     private void addGetCallback(InsnList insnList) {
-        insnList.add(new LdcInsnNode(callbackId));
         insnList.add(new MethodInsnNode(INVOKESTATIC,
                 p(BlackcatJavaAgentCallback.class), "getInstance",
-                sig(BlackcatJavaAgentCallback.class, String.class), false));
+                sig(BlackcatJavaAgentCallback.class), false));
     }
 
     private void addTraceStart() {

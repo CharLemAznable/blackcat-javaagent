@@ -3,6 +3,7 @@ package com.github.bingoohuang.blackcat.javaagent.instrument;
 import com.github.bingoohuang.blackcat.javaagent.callback.BlackcatClientInterceptor;
 import com.github.bingoohuang.blackcat.javaagent.callback.BlackcatJavaAgentCallback;
 import com.github.bingoohuang.blackcat.javaagent.callback.BlackcatJavaAgentInterceptor;
+import com.google.common.base.Throwables;
 
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
@@ -17,37 +18,29 @@ public class BlackcatJavaAgent {
     public static void premain(
             String agentArgs, Instrumentation instrumentation
     ) throws InstantiationException {
-        ++counter;
-        final String callbackId = String.valueOf(counter);
+//        ++counter;
+//        final String callbackId = String.valueOf(counter);
         try {
-            if (agentArgs == null) {
+//            if (agentArgs == null) {
                 agentArgs = BlackcatClientInterceptor.class.getName();
 //                throw new IllegalArgumentException(
 //                        "Agent argument is required of the form " +
 //                                "'interceptor-class-name[;interceptor-custom-args]'");
-            }
-            String[] tokens = agentArgs.split(";", 2);
-            Class<?> clazz = BlackcatJavaAgent.class.getClassLoader().loadClass(tokens[0]);
-            BlackcatJavaAgentInterceptor interceptor;
-            interceptor = (BlackcatJavaAgentInterceptor) clazz.newInstance();
-            interceptor.init(tokens.length == 2 ? tokens[1] : null);
-            BlackcatJavaAgentCallback.registerCallback(callbackId, interceptor);
+//            }
+//            String[] tokens = agentArgs.split(";", 2);
+//            Class<?> clazz = BlackcatJavaAgent.class.getClassLoader().loadClass(tokens[0]);
+//            BlackcatJavaAgentInterceptor interceptor;
+//            interceptor = (BlackcatJavaAgentInterceptor) clazz.newInstance();
+//            interceptor.init(tokens.length == 2 ? tokens[1] : null);
+//            BlackcatJavaAgentCallback.registerCallback(callbackId, interceptor);
 
-            instrumentation.addTransformer(new AgentTransformer(interceptor, callbackId));
+            instrumentation.addTransformer(new AgentTransformer());
         } catch (Throwable th) {
             th.printStackTrace(System.err);
         }
     }
 
     static class AgentTransformer implements ClassFileTransformer {
-        final BlackcatJavaAgentInterceptor interceptor;
-        final String callbackId;
-
-        public AgentTransformer(BlackcatJavaAgentInterceptor interceptor, String callbackId) {
-            this.interceptor = interceptor;
-            this.callbackId = callbackId;
-        }
-
         public byte[] transform(final ClassLoader loader,
                                 final String className,
                                 final Class<?> classBeingRedefined,
@@ -60,9 +53,14 @@ public class BlackcatJavaAgent {
 
             return AccessController.doPrivileged(new PrivilegedAction<byte[]>() {
                 public byte[] run() {
-                    BlackcatInstrument blackcatInstrument = new BlackcatInstrument(
-                            className, classfileBuffer, interceptor, callbackId);
-                    return blackcatInstrument.modifyClass();
+                    try {
+                        BlackcatInstrument blackcatInst = new BlackcatInstrument(
+                                className, classfileBuffer);
+                        return blackcatInst.modifyClass();
+                    } catch (Throwable e) {
+                        e.printStackTrace();
+                        throw Throwables.propagate(e);
+                    }
                 }
             });
         }

@@ -11,7 +11,7 @@ public class SimpleClass {
     public static final String GREETING = "Hello world";
 
     public void callback() {
-        BlackcatJavaAgentCallback callback = BlackcatJavaAgentCallback.getInstance("1");
+        BlackcatJavaAgentCallback callback = BlackcatJavaAgentCallback.getInstance();
         callback.onStart(null);
     }
 

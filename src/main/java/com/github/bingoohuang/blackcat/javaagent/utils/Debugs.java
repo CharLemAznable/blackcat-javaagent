@@ -10,7 +10,7 @@ import java.io.IOException;
 public class Debugs {
     public static void writeClassFile(
             ClassNode cn, String className, byte[] bytes) {
-        if (!Asms.isAnnotationPresent(cn,
+        if (!Asms.isAnnPresent(cn,
                 BlackcatCreateTransformedClassFile.class)) return;
 
         writeClassFile(className, bytes);
