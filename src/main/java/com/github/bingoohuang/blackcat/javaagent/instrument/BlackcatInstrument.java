@@ -57,7 +57,7 @@ public class BlackcatInstrument {
         int count = modifyMethodCount(classNode.methods);
         if (count == 0) return classFileBuffer;
 
-        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
         classNode.accept(cw);
 
         byte[] bytes = cw.toByteArray();
@@ -220,8 +220,12 @@ public class BlackcatInstrument {
 
     private void addCatchBlock(LabelNode startNode, LabelNode endNode) {
         InsnList insnList = new InsnList();
+        LabelNode lastNode = new LabelNode();
+        insnList.add(new JumpInsnNode(GOTO, lastNode));
+
         LabelNode handlerNode = new LabelNode();
         insnList.add(handlerNode);
+        insnList.add(new FrameNode(F_SAME1, 0, null, 1, new Object[] { "java/lang/Throwable" }));
 
         int exceptionVariablePosition = getFistAvailablePosition();
         insnList.add(new VarInsnNode(ASTORE, exceptionVariablePosition));
@@ -237,8 +241,11 @@ public class BlackcatInstrument {
         insnList.add(new VarInsnNode(ALOAD, exceptionVariablePosition));
         insnList.add(new InsnNode(ATHROW));
 
+        insnList.add(lastNode);
+        insnList.add(new FrameNode(F_SAME, 0, null, 0, null));
+
         TryCatchBlockNode blockNode;
-        blockNode = new TryCatchBlockNode(startNode, endNode, handlerNode, null);
+        blockNode = new TryCatchBlockNode(startNode, endNode, handlerNode, "java/lang/Throwable");
 
         methodNode.tryCatchBlocks.add(blockNode);
         methodNode.instructions.add(insnList);
