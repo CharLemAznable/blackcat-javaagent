@@ -178,10 +178,8 @@ public class BlackcatInstrument {
         insnList.add(new VarInsnNode(ALOAD, exceptionVariablePosition));
         insnList.add(new InsnNode(ATHROW));
 
-        TryCatchBlockNode blockNode;
-        blockNode = new TryCatchBlockNode(startNode, endNode, handlerNode, null);
-
-        methodNode.tryCatchBlocks.add(blockNode);
+        methodNode.tryCatchBlocks.add(new TryCatchBlockNode(
+                startNode, endNode, handlerNode, "java/lang/Throwable"));
         methodNode.instructions.add(insnList);
     }
 
