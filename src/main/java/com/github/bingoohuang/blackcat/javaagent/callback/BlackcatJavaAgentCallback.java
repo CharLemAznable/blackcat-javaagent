@@ -22,9 +22,9 @@ public abstract class BlackcatJavaAgentCallback {
         return INSTANCE;
     }
 
-    public final BlackcatMethodRt doStart(Object source, Object[] args) {
+    public final BlackcatMethodRt doStart(String className, String methodDesc, Object[] args) {
         String executionId = getExecutionId();
-        BlackcatMethodRt rt = new BlackcatMethodRt(executionId, source, args);
+        BlackcatMethodRt rt = new BlackcatMethodRt(executionId, className, methodDesc, args);
         try {
             onStart(rt);
         } catch (Throwable th) {

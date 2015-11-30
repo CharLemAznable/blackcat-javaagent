@@ -6,6 +6,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -16,6 +18,8 @@ import static org.apache.commons.io.FilenameUtils.wildcardMatch;
 
 public class BlackcatClientInterceptor
         extends BlackcatJavaAgentInterceptorAdapter {
+    Logger log = LoggerFactory.getLogger(BlackcatClientInterceptor.class);
+
     @Override
     public boolean interceptClass(ClassNode classNode, String className) {
         Class<BlackcatMonitor> annClass = BlackcatMonitor.class;
@@ -32,11 +36,13 @@ public class BlackcatClientInterceptor
 
     @Override
     protected void onThrowableUncaught(BlackcatMethodRt rt) {
+        log.debug("onThrowableUncaught:{}", rt);
         BlackcatClient.send(rt);
     }
 
     @Override
     protected void onFinish(BlackcatMethodRt rt) {
+        log.debug("onThrowableUncaught:{}" + rt);
         BlackcatClient.send(rt);
     }
 

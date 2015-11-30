@@ -1,5 +1,6 @@
 package com.github.bingoohuang.blackcat.javaagent.utils;
 
+import com.github.bingoohuang.blackcat.sdk.utils.StrBuilder;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
@@ -10,7 +11,63 @@ import java.util.List;
 
 import static org.apache.commons.io.FilenameUtils.wildcardMatch;
 
+import static org.objectweb.asm.Opcodes.*;
+import static org.objectweb.asm.Type.getObjectType;
+
 public class Asms {
+
+    public static String describeMethod(MethodNode mn, boolean withThrows) {
+        StrBuilder description = new StrBuilder();
+
+        if ((mn.access & ACC_PUBLIC) != 0) description.p("public ");
+        if ((mn.access & ACC_PRIVATE) != 0) description.p("private ");
+        if ((mn.access & ACC_PROTECTED) != 0) description.p("protected ");
+        if ((mn.access & ACC_STATIC) != 0) description.p("static ");
+        if ((mn.access & ACC_ABSTRACT) != 0) description.p("abstract ");
+        if ((mn.access & ACC_SYNCHRONIZED) != 0) description.p("synchronized ");
+
+        Type returnType = Type.getReturnType(mn.desc);
+        description.p(simpleClassName(returnType.getClassName())).p(' ');
+        description.p(mn.name);
+
+        Type[] argumentTypes = Type.getArgumentTypes(mn.desc);
+        description.p('(');
+        for (int i = 0; i < argumentTypes.length; i++) {
+            Type argumentType = argumentTypes[i];
+            if (i > 0) description.p(", ");
+            String className = argumentType.getClassName();
+            String simpleClassName = simpleClassName(className);
+            description.p(simpleClassName);
+        }
+        description.p(')');
+
+        if (withThrows) {
+            @SuppressWarnings("unchecked")
+            List<String> thrownInternalClassNames = mn.exceptions;
+            if (!thrownInternalClassNames.isEmpty()) {
+                description.p(" throws ");
+                for (String internalClassName : thrownInternalClassNames) {
+                    description.p(getObjectType(internalClassName).getClassName());
+                    description.p(", ");
+                }
+                description.deleteLast();
+            }
+        }
+
+        return description.toString();
+    }
+
+    private static String simpleClassName(String className) {
+        int pos = -1;
+        char[] chars = className.toCharArray();
+        for (int i = 0; i < chars.length; ++i) {
+            char c = chars[i];
+            if (c == '.' || c == '/') pos = i;
+        }
+        return pos > 0 ? className.substring(pos + 1) : className;
+    }
+
+
     public static boolean isAnyMethodAnnPresent(
             List<MethodNode> methods,
             Class<? extends Annotation> annotationClass) {

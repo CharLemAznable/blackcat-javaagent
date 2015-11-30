@@ -1,30 +1,36 @@
 package com.github.bingoohuang.blackcat.javaagent.callback;
 
 import java.lang.management.ManagementFactory;
+import java.util.Arrays;
 
 public class BlackcatMethodRt {
     public final String executionId;
     public final String pid = getPid();
-    public final long startNano = System.nanoTime();
-    public long endNano;
-    public long costNano;
+    public final long startMillis = System.currentTimeMillis();
+    public long endMillis;
+    public long costMillis;
 
-    public final Object source;
+    public final String className;
+    public final String methodDesc;
     public final Object[] args;
     public Throwable throwableCaught;
     public Object result;
     public Throwable throwableUncaught;
     public boolean sameThrowable = false;
 
-
     public static String getPid() {
         String name = ManagementFactory.getRuntimeMXBean().getName();
         return name.split("@")[0]; // --> 742912@localhost
     }
 
-    public BlackcatMethodRt(String executionId, Object source, Object[] args) {
+    public BlackcatMethodRt(
+            String executionId,
+            String className,
+            String methodDesc,
+            Object[] args) {
         this.executionId = executionId;
-        this.source = source;
+        this.className = className;
+        this.methodDesc = methodDesc;
         this.args = args;
     }
 
@@ -43,7 +49,25 @@ public class BlackcatMethodRt {
     }
 
     public void finishExecute() {
-        this.endNano = System.nanoTime();
-        this.costNano = endNano - startNano;
+        this.endMillis = System.currentTimeMillis();
+        this.costMillis = endMillis - startMillis;
+    }
+
+    @Override
+    public String toString() {
+        return "BlackcatMethodRt{" +
+                "executionId='" + executionId + '\'' +
+                ", pid='" + pid + '\'' +
+                ", startMillis=" + startMillis +
+                ", endMillis=" + endMillis +
+                ", costMillis=" + costMillis +
+                ", className=" + className +
+                ", methodDesc=" + methodDesc +
+                ", args=" + Arrays.toString(args) +
+                ", throwableCaught=" + throwableCaught +
+                ", result=" + result +
+                ", throwableUncaught=" + throwableUncaught +
+                ", sameThrowable=" + sameThrowable +
+                '}';
     }
 }

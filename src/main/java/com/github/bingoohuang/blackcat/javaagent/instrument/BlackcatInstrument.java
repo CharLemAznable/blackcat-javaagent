@@ -2,7 +2,8 @@ package com.github.bingoohuang.blackcat.javaagent.instrument;
 
 import com.github.bingoohuang.blackcat.javaagent.callback.BlackcatJavaAgentCallback;
 import com.github.bingoohuang.blackcat.javaagent.callback.BlackcatJavaAgentInterceptor;
-import com.github.bingoohuang.blackcat.javaagent.callback.BlackcatMethodRt;
+import com.github.bingoohuang.blackcat.javaagent.callback.Cat;
+import com.github.bingoohuang.blackcat.javaagent.utils.Asms;
 import com.github.bingoohuang.blackcat.javaagent.utils.Debugs;
 import com.github.bingoohuang.blackcat.javaagent.utils.Helper;
 import org.objectweb.asm.ClassReader;
@@ -30,12 +31,6 @@ public class BlackcatInstrument {
     protected Type[] methodArgs;
     protected Type methodReturnType;
     protected int methodOffset;
-
-    /*
-     Callback arguments: Method scope variables
-     */
-    protected int callbackVarIndex;
-    protected int rtIndex;
 
     protected LabelNode startNode;
 
@@ -93,80 +88,27 @@ public class BlackcatInstrument {
         return true;
     }
 
-    private int addMethodParametersVariable(InsnList il) {
-        il.add(getPushInst(methodArgs.length));
-        il.add(new TypeInsnNode(ANEWARRAY, p(Object.class)));
-        int methodParametersIndex = getFistAvailablePosition();
-        il.add(new VarInsnNode(ASTORE, methodParametersIndex));
-        methodNode.maxLocals++;
-        for (int i = 0; i < methodArgs.length; i++) {
-            il.add(new VarInsnNode(ALOAD, methodParametersIndex));
-            il.add(getPushInst(i));
-            il.add(getLoadInst(methodArgs[i],
-                    getArgumentPosition(i)));
-            MethodInsnNode mNode = getWrapperCtorInst(methodArgs[i]);
-            if (mNode != null) {
-                il.add(mNode);
-            }
-            il.add(new InsnNode(AASTORE));
-        }
-        return methodParametersIndex;
-    }
-
-    private void addGetMethodInvocation(InsnList il) {
-        il.add(getPushInst(methodArgs.length));
-        il.add(new TypeInsnNode(ANEWARRAY, p(Class.class)));
-        int parameterClassesIndex = getFistAvailablePosition();
-        il.add(new VarInsnNode(ASTORE, parameterClassesIndex));
-        methodNode.maxLocals++;
-        int majorVersion = classNode.version & 0xFFFF;
-
-        for (int i = 0; i < methodArgs.length; i++) {
-            il.add(new VarInsnNode(ALOAD, parameterClassesIndex));
-            il.add(getPushInst(i));
-            il.add(getClassRefInst(methodArgs[i], majorVersion));
-            il.add(new InsnNode(AASTORE));
-        }
-
-        il.add(getClassConstantRef(classType, majorVersion));
-        il.add(new LdcInsnNode(methodNode.name));
-        il.add(new VarInsnNode(ALOAD, parameterClassesIndex));
-        il.add(new MethodInsnNode(INVOKESTATIC, p(Helper.class), "getSource",
-                sig(Object.class, Class.class, String.class, Class[].class), false));
-    }
-
-    private int addVarStore(InsnList insnList) {
-        int varIndex = getFistAvailablePosition();
-        insnList.add(new VarInsnNode(ASTORE, varIndex));
-        methodNode.maxLocals++;
-
-        return varIndex;
-    }
-
-    private void addGetCallback(InsnList insnList) {
-        insnList.add(new MethodInsnNode(INVOKESTATIC,
-                p(BlackcatJavaAgentCallback.class), "getInstance",
-                sig(BlackcatJavaAgentCallback.class), false));
-    }
-
     private void addTraceStart() {
         InsnList insnList = new InsnList();
-        int methodParametersIndex = addMethodParametersVariable(insnList);
-        addGetMethodInvocation(insnList);
-        int sourceVarIndex = addVarStore(insnList);
-        addGetCallback(insnList);
-        callbackVarIndex = addVarStore(insnList);
+        insnList.add(new LdcInsnNode(className));
+        insnList.add(new LdcInsnNode(Asms.describeMethod(methodNode, false)));
+        insnList.add(getPushInst(methodArgs.length));
+        insnList.add(new TypeInsnNode(ANEWARRAY, p(Object.class)));
+        for (int i = 0; i < methodArgs.length; i++) {
+            insnList.add(new InsnNode(DUP));
+            insnList.add(getPushInst(i));
+            insnList.add(getLoadInst(methodArgs[i], getArgumentPosition(i)));
+            MethodInsnNode mNode = getWrapperCtorInst(methodArgs[i]);
+            if (mNode != null) insnList.add(mNode);
+            insnList.add(new InsnNode(AASTORE));
+        }
 
-        insnList.add(new VarInsnNode(ALOAD, callbackVarIndex));
-        insnList.add(new VarInsnNode(ALOAD, sourceVarIndex));
-        insnList.add(new VarInsnNode(ALOAD, methodParametersIndex));
-        insnList.add(new MethodInsnNode(INVOKEVIRTUAL,
-                p(BlackcatJavaAgentCallback.class), "doStart",
-                sig(BlackcatMethodRt.class, Object.class, Object[].class), false));
+        insnList.add(new MethodInsnNode(INVOKESTATIC,
+                p(Cat.class),
+                "start",
+                sig(void.class, String.class, String.class, Object[].class),
+                false));
 
-        rtIndex = getFistAvailablePosition();
-        insnList.add(new VarInsnNode(ASTORE, rtIndex));
-        methodNode.maxLocals++;
         startNode = new LabelNode();
         methodNode.instructions.insert(startNode);
         methodNode.instructions.insert(insnList);
@@ -177,18 +119,18 @@ public class BlackcatInstrument {
 
         Iterator<AbstractInsnNode> it = insnList.iterator();
         while (it.hasNext()) {
-            AbstractInsnNode abstractInsnNode = it.next();
+            AbstractInsnNode insnNode = it.next();
 
-            switch (abstractInsnNode.getOpcode()) {
+            switch (insnNode.getOpcode()) {
                 case RETURN:
-                    insnList.insertBefore(abstractInsnNode, getVoidReturnTraceInsts());
+                    insnList.insertBefore(insnNode, getVoidReturnTraceInsts());
                     break;
                 case IRETURN:
                 case LRETURN:
                 case FRETURN:
                 case ARETURN:
                 case DRETURN:
-                    insnList.insertBefore(abstractInsnNode, getReturnTraceInsts());
+                    insnList.insertBefore(insnNode, getReturnTraceInsts());
             }
         }
     }
@@ -198,11 +140,11 @@ public class BlackcatInstrument {
 
         Iterator<AbstractInsnNode> it = insnList.iterator();
         while (it.hasNext()) {
-            AbstractInsnNode abstractInsnNode = it.next();
+            AbstractInsnNode insnNode = it.next();
 
-            switch (abstractInsnNode.getOpcode()) {
+            switch (insnNode.getOpcode()) {
                 case ATHROW:
-                    insnList.insertBefore(abstractInsnNode, getThrowTraceInsts());
+                    insnList.insertBefore(insnNode, getThrowTraceInsts());
                     break;
             }
         }
@@ -220,32 +162,24 @@ public class BlackcatInstrument {
 
     private void addCatchBlock(LabelNode startNode, LabelNode endNode) {
         InsnList insnList = new InsnList();
-        LabelNode lastNode = new LabelNode();
-        insnList.add(new JumpInsnNode(GOTO, lastNode));
 
         LabelNode handlerNode = new LabelNode();
         insnList.add(handlerNode);
-        insnList.add(new FrameNode(F_SAME1, 0, null, 1, new Object[] { "java/lang/Throwable" }));
 
         int exceptionVariablePosition = getFistAvailablePosition();
         insnList.add(new VarInsnNode(ASTORE, exceptionVariablePosition));
         methodOffset++;
 
-        insnList.add(new VarInsnNode(ALOAD, callbackVarIndex));
-        insnList.add(new VarInsnNode(ALOAD, rtIndex));
         insnList.add(new VarInsnNode(ALOAD, exceptionVariablePosition));
-        insnList.add(new MethodInsnNode(INVOKEVIRTUAL,
-                p(BlackcatJavaAgentCallback.class), "doThrowableUncaught",
-                sig(void.class, BlackcatMethodRt.class, Throwable.class), false));
+        insnList.add(new MethodInsnNode(INVOKESTATIC,
+                p(Cat.class), "uncaught",
+                sig(void.class, Throwable.class), false));
 
         insnList.add(new VarInsnNode(ALOAD, exceptionVariablePosition));
         insnList.add(new InsnNode(ATHROW));
 
-        insnList.add(lastNode);
-        insnList.add(new FrameNode(F_SAME, 0, null, 0, null));
-
         TryCatchBlockNode blockNode;
-        blockNode = new TryCatchBlockNode(startNode, endNode, handlerNode, "java/lang/Throwable");
+        blockNode = new TryCatchBlockNode(startNode, endNode, handlerNode, null);
 
         methodNode.tryCatchBlocks.add(blockNode);
         methodNode.instructions.add(insnList);
@@ -253,11 +187,9 @@ public class BlackcatInstrument {
 
     private InsnList getVoidReturnTraceInsts() {
         InsnList insnList = new InsnList();
-        insnList.add(new VarInsnNode(ALOAD, callbackVarIndex));
-        insnList.add(new VarInsnNode(ALOAD, rtIndex));
-        insnList.add(new MethodInsnNode(INVOKEVIRTUAL,
-                p(BlackcatJavaAgentCallback.class), "doVoidFinish",
-                sig(void.class, BlackcatMethodRt.class), false));
+        insnList.add(new MethodInsnNode(INVOKESTATIC,
+                p(Cat.class), "finish",
+                sig(void.class), false));
 
         return insnList;
     }
@@ -269,12 +201,10 @@ public class BlackcatInstrument {
         insnList.add(new VarInsnNode(ASTORE, exceptionVariablePosition));
 
         methodOffset++;
-        insnList.add(new VarInsnNode(ALOAD, callbackVarIndex));
-        insnList.add(new VarInsnNode(ALOAD, rtIndex));
         insnList.add(new VarInsnNode(ALOAD, exceptionVariablePosition));
-        insnList.add(new MethodInsnNode(INVOKEVIRTUAL,
-                p(BlackcatJavaAgentCallback.class), "doThrowableCaught",
-                sig(void.class, BlackcatMethodRt.class, Throwable.class), false));
+        insnList.add(new MethodInsnNode(INVOKESTATIC,
+                p(Cat.class), "caught",
+                sig(void.class, Throwable.class), false));
 
         insnList.add(new VarInsnNode(ALOAD, exceptionVariablePosition));
 
@@ -284,23 +214,20 @@ public class BlackcatInstrument {
     private InsnList getReturnTraceInsts() {
         InsnList insnList = new InsnList();
 
-        int retunedVariablePosition = getFistAvailablePosition();
-        insnList.add(getStoreInst(methodReturnType, retunedVariablePosition));
+        int returnedVariablePosition = getFistAvailablePosition();
+        insnList.add(getStoreInst(methodReturnType, returnedVariablePosition));
 
         updateMethodOffset(methodReturnType);
-        insnList.add(new VarInsnNode(ALOAD, callbackVarIndex));
-        insnList.add(new VarInsnNode(ALOAD, rtIndex));
-        insnList.add(getLoadInst(methodReturnType, retunedVariablePosition));
+        insnList.add(getLoadInst(methodReturnType, returnedVariablePosition));
         MethodInsnNode mNode = getWrapperCtorInst(methodReturnType);
         if (mNode != null) insnList.add(mNode);
-        insnList.add(new MethodInsnNode(INVOKEVIRTUAL,
-                p(BlackcatJavaAgentCallback.class), "doFinish",
-                sig(void.class, BlackcatMethodRt.class, Object.class), false));
+        insnList.add(new MethodInsnNode(INVOKESTATIC,
+                p(Cat.class), "finish",
+                sig(void.class, Object.class), false));
 
-        insnList.add(getLoadInst(methodReturnType, retunedVariablePosition));
+        insnList.add(getLoadInst(methodReturnType, returnedVariablePosition));
 
         return insnList;
-
     }
 
     private int getFistAvailablePosition() {

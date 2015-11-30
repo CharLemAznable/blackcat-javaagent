@@ -12,8 +12,6 @@ import org.objectweb.asm.tree.MethodNode;
 import java.io.File;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 import java.util.Date;
 
 public class LoggingInterceptor extends BlackcatJavaAgentInterceptor {
@@ -50,8 +48,10 @@ public class LoggingInterceptor extends BlackcatJavaAgentInterceptor {
     protected void onStart(BlackcatMethodRt rt) {
         File file = getFile(rt);
         trace(file, "#onStart:" + rt.executionId);
-        trace(file, "#Source: " + rt.source);
-        trace(file, "#Start: " + new Date(rt.startNano));
+        trace(file, "#ClassName: " + rt.className);
+        trace(file, "#MethodDesc: " + rt.methodDesc);
+        trace(file, "#Source: " + rt.className);
+        trace(file, "#Start: " + new Date(rt.startMillis));
         trace(file, "#Parameters:" + toJSON(rt.args));
     }
 
@@ -59,7 +59,7 @@ public class LoggingInterceptor extends BlackcatJavaAgentInterceptor {
     protected void onThrowableCaught(BlackcatMethodRt rt) {
         File file = getFile(rt);
         trace(file, "#onThrowableCaught:" + rt.executionId);
-        trace(file, "#Elapsed: " + rt.costNano + " ns");
+        trace(file, "#Elapsed: " + rt.costMillis + " ns");
         trace(file, "#SAME:" + (rt.throwableUncaught == rt.throwableCaught));
         trace(file, "#Catch:" + rt.throwableCaught);
         trace(file, "#Catch JSON:" + toJSON(rt.throwableCaught));
@@ -69,7 +69,7 @@ public class LoggingInterceptor extends BlackcatJavaAgentInterceptor {
     protected void onThrowableUncaught(BlackcatMethodRt rt) {
         File file = getFile(rt);
         trace(file, "#onThrowableUncaught:" + rt.executionId);
-        trace(file, "#Elapsed: " + rt.costNano + " ns");
+        trace(file, "#Elapsed: " + rt.costMillis + " ns");
         trace(file, "#SAME:" + (rt.throwableUncaught == rt.throwableCaught));
         trace(file, "#Thrown:" + rt.throwableUncaught);
         trace(file, "#ThrownJSON:" + toJSON(rt.throwableCaught));
@@ -80,7 +80,7 @@ public class LoggingInterceptor extends BlackcatJavaAgentInterceptor {
     protected void onFinish(BlackcatMethodRt rt) {
         File file = getFile(rt);
         trace(file, "#onFinish:" + rt.executionId);
-        trace(file, "#Elapsed: " + rt.costNano + " ns");
+        trace(file, "#Elapsed: " + rt.costMillis + " ns");
         trace(file, "#Returned:" + toJSON(rt.result));
         trace(file, "End of onFinish\n\n");
     }
@@ -100,21 +100,7 @@ public class LoggingInterceptor extends BlackcatJavaAgentInterceptor {
         String loggingFolderPath = "JVM-" + ManagementFactory.getRuntimeMXBean().getStartTime()
                 + "/" + Thread.currentThread().getName()
                 + "-" + Thread.currentThread().getId()
-                + "/" + rt.executionId + "-";
-        if (rt.source instanceof Method) {
-            Method m = (Method) rt.source;
-            loggingFolderPath += m.getDeclaringClass().getName() + "." + m.getName() + "()";
-        } else if (rt.source instanceof Constructor) {
-            Constructor c = (Constructor) rt.source;
-            String className = c.getDeclaringClass().getName();
-            if (className != null && className.length() > 0) {
-                loggingFolderPath += className + ".init()";
-            } else {
-                loggingFolderPath += "init()";
-            }
-        } else {
-            loggingFolderPath += rt.source;
-        }
+                + "/" + rt.executionId + "-" + rt.className;
         loggingFolderPath += ".log";
         loggingFolderPath = loggingFolderPath.replaceAll("[<>:]", "-");
         File ret = new File(rootFile, loggingFolderPath);
