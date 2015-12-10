@@ -35,6 +35,7 @@ public class BlackcatMethodRuntimeProducer {
                     .setCostMillis(blackcatMethodRt.costMillis)
 
                     .setClassName(blackcatMethodRt.className)
+                    .setMethodName(blackcatMethodRt.methodName)
                     .setMethodDesc(blackcatMethodRt.methodDesc)
                     .setArgs(toJSON(blackcatMethodRt.args))
                     .setResult(toJSON(blackcatMethodRt.result))

@@ -2,8 +2,8 @@ package com.github.bingoohuang.blackcat.javaagent.callback;
 
 import com.github.bingoohuang.blackcat.javaagent.annotations.BlackcatMonitor;
 import com.github.bingoohuang.blackcat.javaagent.discruptor.BlackcatClient;
+import com.github.bingoohuang.blackcat.javaagent.utils.Asms;
 import org.apache.commons.lang3.StringUtils;
-import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.slf4j.Logger;
@@ -72,8 +72,10 @@ public class BlackcatClientInterceptor
                 List visibleAnns = methodNode.visibleAnnotations;
                 if (isWildAnnPresent(wildAnnClassId, visibleAnns)) return true;
             } else {
-                Type methodType = Type.getMethodType(methodNode.desc);
-                String methodTypeString = methodType.toString();
+                String methodTypeString = Asms.describeMethod(methodNode, false);
+
+                log.debug("interceptMethod:{}, methodTypeString:{}",
+                        interceptMethod, methodTypeString);
 
                 if (wildcardMatch(methodTypeString, interceptMethod)) {
                     return true;

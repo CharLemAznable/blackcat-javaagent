@@ -1,8 +1,6 @@
 package com.github.bingoohuang.blackcat.javaagent.instrument;
 
 import com.github.bingoohuang.blackcat.javaagent.callback.BlackcatClientInterceptor;
-import com.github.bingoohuang.blackcat.javaagent.callback.BlackcatJavaAgentCallback;
-import com.github.bingoohuang.blackcat.javaagent.callback.BlackcatJavaAgentInterceptor;
 import com.google.common.base.Throwables;
 
 import java.lang.instrument.ClassFileTransformer;
@@ -22,7 +20,7 @@ public class BlackcatJavaAgent {
 //        final String callbackId = String.valueOf(counter);
         try {
 //            if (agentArgs == null) {
-                agentArgs = BlackcatClientInterceptor.class.getName();
+            agentArgs = BlackcatClientInterceptor.class.getName();
 //                throw new IllegalArgumentException(
 //                        "Agent argument is required of the form " +
 //                                "'interceptor-class-name[;interceptor-custom-args]'");
@@ -54,9 +52,9 @@ public class BlackcatJavaAgent {
             return AccessController.doPrivileged(new PrivilegedAction<byte[]>() {
                 public byte[] run() {
                     try {
-                        BlackcatInstrument blackcatInst = new BlackcatInstrument(
-                                className, classfileBuffer);
-                        return blackcatInst.modifyClass();
+                        BlackcatInstrument blackcatInst;
+                        blackcatInst = new BlackcatInstrument(classfileBuffer);
+                        return blackcatInst.modifyClass().y;
                     } catch (Throwable e) {
                         e.printStackTrace();
                         throw Throwables.propagate(e);

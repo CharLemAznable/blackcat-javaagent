@@ -6,6 +6,7 @@ import com.github.bingoohuang.blackcat.javaagent.callback.Cat;
 import com.github.bingoohuang.blackcat.javaagent.utils.Asms;
 import com.github.bingoohuang.blackcat.javaagent.utils.Debugs;
 import com.github.bingoohuang.blackcat.javaagent.utils.Helper;
+import com.github.bingoohuang.blackcat.javaagent.utils.Tuple;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
@@ -14,8 +15,7 @@ import org.objectweb.asm.tree.*;
 import java.util.Iterator;
 import java.util.List;
 
-import static com.github.bingoohuang.blackcat.javaagent.utils.Asms.p;
-import static com.github.bingoohuang.blackcat.javaagent.utils.Asms.sig;
+import static com.github.bingoohuang.blackcat.javaagent.utils.Asms.*;
 import static com.github.bingoohuang.blackcat.javaagent.utils.TreeAsms.*;
 import static org.objectweb.asm.Opcodes.*;
 
@@ -34,23 +34,24 @@ public class BlackcatInstrument {
 
     protected LabelNode startNode;
 
-    public BlackcatInstrument(
-            String className, byte[] classFileBuffer) {
-        this.className = className;
-        this.classFileBuffer = classFileBuffer;
-    }
+    protected int catVarIndex;
 
-    public byte[] modifyClass() {
+    public BlackcatInstrument(byte[] classFileBuffer) {
+        this.classFileBuffer = classFileBuffer;
+
         classNode = new ClassNode();
         ClassReader cr = new ClassReader(classFileBuffer);
         cr.accept(classNode, 0);
+        className = c(classNode.name);
         classType = Type.getType("L" + classNode.name + ";");
+    }
 
+    public Tuple<Boolean, byte[]> modifyClass() {
         boolean ok = interceptor.interceptClass(classNode, className);
-        if (!ok) return classFileBuffer;
+        if (!ok) return new Tuple(false, classFileBuffer);
 
         int count = modifyMethodCount(classNode.methods);
-        if (count == 0) return classFileBuffer;
+        if (count == 0) return new Tuple(false, classFileBuffer);
 
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
         classNode.accept(cw);
@@ -59,7 +60,7 @@ public class BlackcatInstrument {
 
         Debugs.writeClassFile(classNode, className, bytes);
 
-        return bytes;
+        return new Tuple(true, bytes);
     }
 
     private int modifyMethodCount(List<MethodNode> methods) {
@@ -90,7 +91,12 @@ public class BlackcatInstrument {
 
     private void addTraceStart() {
         InsnList insnList = new InsnList();
+
+        addGetCallback(insnList);
+
+        insnList.add(new VarInsnNode(ALOAD, catVarIndex));
         insnList.add(new LdcInsnNode(className));
+        insnList.add(new LdcInsnNode(methodNode.name));
         insnList.add(new LdcInsnNode(Asms.describeMethod(methodNode, false)));
         insnList.add(getPushInst(methodArgs.length));
         insnList.add(new TypeInsnNode(ANEWARRAY, p(Object.class)));
@@ -103,15 +109,26 @@ public class BlackcatInstrument {
             insnList.add(new InsnNode(AASTORE));
         }
 
-        insnList.add(new MethodInsnNode(INVOKESTATIC,
+        insnList.add(new MethodInsnNode(INVOKEVIRTUAL,
                 p(Cat.class),
                 "start",
-                sig(void.class, String.class, String.class, Object[].class),
+                sig(void.class,
+                        String.class, String.class, String.class, Object[].class),
                 false));
 
         startNode = new LabelNode();
         methodNode.instructions.insert(startNode);
         methodNode.instructions.insert(insnList);
+    }
+
+    private void addGetCallback(InsnList insnList) {
+        insnList.add(new TypeInsnNode(NEW, p(Cat.class)));
+        insnList.add(new InsnNode(DUP));
+        insnList.add(new MethodInsnNode(INVOKESPECIAL,
+                p(Cat.class), "<init>", sig(void.class), false));
+        catVarIndex = getFistAvailablePosition();
+        insnList.add(new VarInsnNode(ASTORE, catVarIndex));
+        methodNode.maxLocals++;
     }
 
     private void addTraceReturn() {
@@ -170,8 +187,9 @@ public class BlackcatInstrument {
         insnList.add(new VarInsnNode(ASTORE, exceptionVariablePosition));
         methodOffset++;
 
+        insnList.add(new VarInsnNode(ALOAD, catVarIndex));
         insnList.add(new VarInsnNode(ALOAD, exceptionVariablePosition));
-        insnList.add(new MethodInsnNode(INVOKESTATIC,
+        insnList.add(new MethodInsnNode(INVOKEVIRTUAL,
                 p(Cat.class), "uncaught",
                 sig(void.class, Throwable.class), false));
 
@@ -185,7 +203,8 @@ public class BlackcatInstrument {
 
     private InsnList getVoidReturnTraceInsts() {
         InsnList insnList = new InsnList();
-        insnList.add(new MethodInsnNode(INVOKESTATIC,
+        insnList.add(new VarInsnNode(ALOAD, catVarIndex));
+        insnList.add(new MethodInsnNode(INVOKEVIRTUAL,
                 p(Cat.class), "finish",
                 sig(void.class), false));
 
@@ -199,8 +218,10 @@ public class BlackcatInstrument {
         insnList.add(new VarInsnNode(ASTORE, exceptionVariablePosition));
 
         methodOffset++;
+
+        insnList.add(new VarInsnNode(ALOAD, catVarIndex));
         insnList.add(new VarInsnNode(ALOAD, exceptionVariablePosition));
-        insnList.add(new MethodInsnNode(INVOKESTATIC,
+        insnList.add(new MethodInsnNode(INVOKEVIRTUAL,
                 p(Cat.class), "caught",
                 sig(void.class, Throwable.class), false));
 
@@ -212,6 +233,7 @@ public class BlackcatInstrument {
     private InsnList getReturnTraceInsts() {
         InsnList insnList = new InsnList();
 
+        insnList.add(new VarInsnNode(ALOAD, catVarIndex));
         int returnedVariablePosition = getFistAvailablePosition();
         insnList.add(getStoreInst(methodReturnType, returnedVariablePosition));
 
@@ -219,7 +241,7 @@ public class BlackcatInstrument {
         insnList.add(getLoadInst(methodReturnType, returnedVariablePosition));
         MethodInsnNode mNode = getWrapperCtorInst(methodReturnType);
         if (mNode != null) insnList.add(mNode);
-        insnList.add(new MethodInsnNode(INVOKESTATIC,
+        insnList.add(new MethodInsnNode(INVOKEVIRTUAL,
                 p(Cat.class), "finish",
                 sig(void.class, Object.class), false));
 
@@ -240,4 +262,5 @@ public class BlackcatInstrument {
     public int getArgumentPosition(int argNo) {
         return Helper.getArgPosition(methodOffset, methodArgs, argNo);
     }
+
 }

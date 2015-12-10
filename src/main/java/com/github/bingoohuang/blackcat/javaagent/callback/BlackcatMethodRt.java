@@ -11,6 +11,7 @@ public class BlackcatMethodRt {
     public long costMillis;
 
     public final String className;
+    public final String methodName;
     public final String methodDesc;
     public final Object[] args;
     public Throwable throwableCaught;
@@ -26,10 +27,12 @@ public class BlackcatMethodRt {
     public BlackcatMethodRt(
             String executionId,
             String className,
+            String methodName,
             String methodDesc,
             Object[] args) {
         this.executionId = executionId;
         this.className = className;
+        this.methodName = methodName;
         this.methodDesc = methodDesc;
         this.args = args;
     }
@@ -62,6 +65,7 @@ public class BlackcatMethodRt {
                 ", endMillis=" + endMillis +
                 ", costMillis=" + costMillis +
                 ", className=" + className +
+                ", methodName=" + methodName +
                 ", methodDesc=" + methodDesc +
                 ", args=" + Arrays.toString(args) +
                 ", throwableCaught=" + throwableCaught +
