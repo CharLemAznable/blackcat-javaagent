@@ -63,7 +63,7 @@ public class BlackcatMethodRuntimeProducer {
             Object[] arr = (Object[]) object;
             boolean first = true;
             for (Object obj : arr) {
-                if (first) strBuilder.p(", ");
+                if (!first) strBuilder.p(", ");
                 strBuilder.p(toJSON(obj));
                 first = false;
             }
